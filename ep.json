@@ -1,0 +1,17 @@
+{
+    "parts": [
+        {
+            "name": "ep_activepads",
+            "hooks": {
+                "expressCreateServer" : "ep_activepads/index:registerRoute",
+                "socketio" : "ep_activepads/index:socketio",
+                "padRemove" : "ep_activepads/index:updatePads",
+                "padCreate" : "ep_activepads/index:updatePads",
+                "eejsBlock_adminMenu" : "ep_activepads/index:eejsBlock_adminMenu"
+            },
+            "client_hooks" : {
+                "documentReady" : "ep_activepads/static/js/admin/activepads:documentReady"
+            }
+        }
+    ]
+}
