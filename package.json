@@ -1,6 +1,6 @@
 {
   "name": "ep_activepads",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "description": "Gives the ability to list pads people are working on.",
   "author": "Egor Nazarov <enazarov@gmail.com>",
@@ -9,8 +9,5 @@
   "repository" :
    { "type" : "git"
     , "url" : "https://github.com/eqr/ep_activepads"
-  },
-  "dependencies": {
-    "log4js" : ">= 0.5.x"
   }
 }

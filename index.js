@@ -1,123 +1,90 @@
-var eejs = require('ep_etherpad-lite/node/eejs')
-  , padManager = require('ep_etherpad-lite/node/db/PadManager')
-  , api = require('ep_etherpad-lite/node/db/API')
-  , log4js = require('log4js')
-  , logger = log4js.getLogger("plugin:activepads")
-;
+const eejs = require('ep_etherpad-lite/node/eejs')
+const padManager = require('ep_etherpad-lite/node/db/PadManager')
+const api = require('ep_etherpad-lite/node/db/API')
+  ;
 
-var pads={
-  pads:[] ,
-  search: function(query, callback){
-    logger.debug("Admin/ActivePad search");
-    logger.debug(padManager);
-     padManager.listAllPads(function(null_value, the_pads) {
-      logger.debug("inside list all pads")
-      pads._do_search(the_pads.padIDs, query, callback);
-    });
+var pads = {
+  pads: [],
+  search: async function (query) {
+    let the_pads = await padManager.listAllPads();
+    return await pads._do_search(the_pads.padIDs, query);
   },
-  _do_search: function(pads, query, callback){
-    logger.debug("Admin/ActivePad do search");
-    var data={
-        progress : 1
-        , message: "Search done."
-        , total: pads.length
-      }
-      , maxResult=0
-      , result=[]
-    ;
-    
-    result = pads;    
-    data.total=result.length;
-    logger.debug("total: " + data.total);
-    maxResult=result.length-1;
-    if(maxResult<0)maxResult=0;
-    pads.pads=result;
-    
+  _do_search: function (pads) {
+    var data = {
+      progress: 1
+      , message: "Search done."
+      , total: pads.length
+    }
+      , maxResult = 0
+      , result = []
+      ;
+
+    result = pads;
+    data.total = result.length;
+
+    maxResult = result.length - 1;
+    if (maxResult < 0) maxResult = 0;
+    pads.pads = result;
+
     var entryset;
-    data.results=[];
-    
-    result.forEach(function(value){
-      entryset={padName:value, lastEdited:'', userCount:0};
+    data.results = [];
+
+    result.forEach(function (value) {
+      entryset = { padName: value, lastEdited: '', userCount: 0 };
       data.results.push(entryset);
     });
-    
-    var numOfQueries={
-        count : data.results.length*2,
-        inc : function(){return ++this.count;},
-        dec : function(){return --this.count;},
-        val : function(){return this.count;}
-    };
-    
-    if(data.results.length > 0){
-        data.results.forEach(function(value){
-          api.getLastEdited(value.padName,function(err,resultObject){
-              if(err==null){
-                  value.lastEdited=resultObject.lastEdited;
-              }
-              if(numOfQueries.dec() <= 0){
-                  callback(data);
-              }
-          })
-          api.padUsersCount(value.padName,function(err,resultObject){
-              if(err==null){
-                  value.userCount=resultObject.padUsersCount;
-              }
-              if(numOfQueries.dec() <= 0){
-                  callback(data);
-              }
-          });
-        });
-    }else{
+
+    if (data.results.length > 0) {
+      data.results.forEach(function (value) {
+        let resultObject = api.getLastEdited(value.padName);
+        value.lastEdited = resultObject.lastEdited;
+        resultObject = api.padUsersCount(value.padName);
+        value.userCount = resultObject.padUsersCount;
+      });
+    } else {
       data.message = "No results";
-      callback(data);
     }
+    return data;
   }
 };
 
-exports.registerRoute = function (hook_name, args, cb) {
-  logger.debug("Admin/ActivePad register route");
-  args.app.get('/admin/activepads', function(req, res) {    
+exports.registerRoute = async function (hook_name, args) {
+  args.app.get('/admin/activepads', function (req, res) {
     var render_args = {
       errors: []
     };
-    res.send( eejs.require("ep_activepads/templates/admin/activepads.html", render_args) );
+    res.send(eejs.require("ep_activepads/templates/admin/activepads.html", render_args));
   });
 };
 
 var io = null;
 
-exports.socketio = function (hook_name, args, cb) {
-    logger.debug("Admin/ActivePad socket.io");
+exports.socketio = function (hook_name, args) {
+
   io = args.io.of("/pluginfw/admin/activepads");
   io.on('connection', function (socket) {
-    socket.on("load", function (query) {
-      pads.search({pattern:''}, function (progress) {
-        socket.emit("search-result", progress);
-      });
+    socket.on("load", async function (query) {
+      let result = await pads.search({pattern: "", offset: 0, limit: queryLimit});
+      socket.emit("search-result", result);
     });
 
-    socket.on("search", function (query) {
-      logger.debug("Admin/ActivePad on search");
-      pads.search(query, function (progress) {
-        socket.emit("search-result", progress);
-      });
+    socket.on("search", async function (query) {
+      let result = await pads.search(query);
+      socket.emit("search-result", result);
     });
   });
 };
 
-exports.eejsBlock_adminMenu = function (hook_name, args, cb) {
-  logger.debug("Admin/ActivePad admin menu");
-  var hasAdminUrlPrefix = (args.content.indexOf('<a href="admin/') != -1)
-    , hasOneDirDown = (args.content.indexOf('<a href="../') != -1)
-    , hasTwoDirDown = (args.content.indexOf('<a href="../../') != -1)
-    , urlPrefix = hasAdminUrlPrefix ? "admin/" : hasTwoDirDown ? "../../" : hasOneDirDown ? "../" : ""
+exports.eejsBlock_adminMenu = function (hook_name, args) {
+  let hasAdminUrlPrefix = (args.content.indexOf("<a href=\"admin/") !== -1)
+  , hasOneDirDown = (args.content.indexOf("<a href=\"../") !== -1)
+  , hasTwoDirDown = (args.content.indexOf("<a href=\"../../") !== -1)
+  , urlPrefix = hasAdminUrlPrefix ? "admin/" : hasTwoDirDown ? "../../" : hasOneDirDown ? "../" : ""
   ;
-  
-  args.content = args.content + '<li><a href="'+ urlPrefix +'activepads">Active pads</a> </li>';
-  return cb();
+
+  args.content = args.content + "<li><a href=\"" + urlPrefix + "activepads\">Active Pads</a></li>";
 };
 
-exports.updatePads=function(hook_name, args, cb){
-  logger.debug("Admin/ActivePad update pads");
-  io.emit("progress",{progress:1});
+exports.updatePads = function (hook_name, args, cb) {
+  io.emit("progress", { progress: 1 });
 };
