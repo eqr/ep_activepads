@@ -1,7 +1,6 @@
 const eejs = require('ep_etherpad-lite/node/eejs')
 const padManager = require('ep_etherpad-lite/node/db/PadManager')
-const api = require('ep_etherpad-lite/node/db/API')
-  ;
+const api = require('ep_etherpad-lite/node/db/API');
 
 var pads = {
   pads: [],
@@ -55,11 +54,12 @@ exports.registerRoute = async function (hook_name, args) {
     };
     res.send(eejs.require("ep_activepads/templates/admin/activepads.html", render_args));
   });
+  return;
 };
 
 var io = null;
 
-exports.socketio = function (hook_name, args) {
+exports.socketio = function (hook_name, args, cb) {
 
   io = args.io.of("/pluginfw/admin/activepads");
   io.on('connection', function (socket) {
@@ -73,18 +73,21 @@ exports.socketio = function (hook_name, args) {
       socket.emit("search-result", result);
     });
   });
+  cb();
 };
 
-exports.eejsBlock_adminMenu = function (hook_name, args) {
+exports.eejsBlock_adminMenu = function (hook_name, args, cb) {
   let hasAdminUrlPrefix = (args.content.indexOf("<a href=\"admin/") !== -1)
   , hasOneDirDown = (args.content.indexOf("<a href=\"../") !== -1)
   , hasTwoDirDown = (args.content.indexOf("<a href=\"../../") !== -1)
   , urlPrefix = hasAdminUrlPrefix ? "admin/" : hasTwoDirDown ? "../../" : hasOneDirDown ? "../" : ""
   ;
 
-  args.content = args.content + "<li><a href=\"" + urlPrefix + "activepads\">Active Pads</a></li>";
+  args.content += "<li><a href=\"" + urlPrefix + "activepads\">Active Pads</a></li>";
+  cb()
 };
 
 exports.updatePads = function (hook_name, args, cb) {
   io.emit("progress", { progress: 1 });
+  cb();
 };
